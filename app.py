@@ -180,10 +180,10 @@ def book_list():
             return {
                 "message": "Expected: {title} by {author}."
             }, status.HTTP_204_NO_CONTENT
-        title, author = bleach.clean(text).replace(" ", "").split('by')
+        title, author = bleach.clean(text).split('by')
         book = Book(
-            title=title,
-            author=author,
+            title=title.strip(),
+            author=author.strip(),
             owner=g.user,
         )
         db.session.add(book)
@@ -228,12 +228,9 @@ def book_detail(key):
 
     if request.method == 'PUT':
         text = str(request.data.get('text', ''))
-        title, author = bleach.clean(text).replace(
-            " ",
-            ""
-        ).split('by') if text else '', ''
+        title, author = bleach.clean(text).split('by') if text else '', ''
         if book:
-            book.title, book.author = title, author
+            book.title, book.author = title.strip(), author.strip()
         else:
             book = Book(
                 title=title,
