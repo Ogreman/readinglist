@@ -1,16 +1,22 @@
 {% extends "layout.html" %}
 
 {% block body %}
-<h1>Sign In</h1>
+<h1 style="
+    position: fixed;
+    left: 15px;
+    top: 5px;
+    font-size: 35px;
+">
 <form action="" method="post" name="login">
     {{form.hidden_tag()}}
     <p>
         Please enter your username:<br>
-        {{form.username(size=80)}}
+        {{form.username(size=40)}}
         {% for error in form.errors.openid %}
         <span style="color: red;">[{{error}}]</span>
         {% endfor %}<br>
     </p>
     <p><input type="submit" value="Sign In"></p>
 </form>
+</h1>
 {% endblock %}
