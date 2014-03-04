@@ -1,0 +1,95 @@
+
+{% extends 'layout.html' %}
+
+{% block body %}
+<h1 style="
+    position: fixed;
+    left: 15px;
+    top: 5px;
+    font-size: 35px;
+">
+<input type="text" id="text" name="text" onkeydown="if (event.keyCode == 13) document.getElementById('btnPost').click()" />
+<button id="btnPost" onclick="handleForm()" type="button">add</button>
+<div id="status" style="font-size: 30px;"></div>
+</h1>
+
+<h1 style="position: relative; top: 100px; left: 15px;">
+<div id="books">
+    <div id="new"></div>
+    {% for book in books %}
+        <p id="book-{{ book.id }}">
+            <a href="{{ book.url }}">{{ book.title }} by {{ book.author }}</a>
+            {% if not book.start %}
+                <button class="btnStart" data-id="{{ book.id }}" type="button">start</button>
+            {% endif %}
+            {% if not book.finish %}
+                <button class="btnStop" data-id="{{ book.id }}" type="button">finish</button>
+            {% endif %}
+            {% if book.time %}
+                <p style="font-size: 18px;">{{ book.time }}s</p>
+            {% endif %}
+        </p>
+    {% endfor %}
+</div>
+</h1>
+
+<script type="text/javascript">
+
+function handleForm(){
+    if (window.jQuery){
+        $(function() {
+            $("#status")[0].innerHTML="posting..."
+            $.post('/api/', {
+                text: $("#text").val()
+            })
+            .done(function(data) {
+                $("#text").val("");
+                if (data.message) {
+                    $("#status")[0].innerHTML=data.message;
+                } else {
+                    if (data.created) {
+                        $('<p id="book-' + data.id + '">' + data.title + ' by ' + data.author + '</p>').insertAfter("#new");
+                        $("#status")[0].innerHTML="POSTED!"
+                    } else {
+                        $("#status")[0].innerHTML="FAILED!"
+                    }
+                }
+            })
+            .error(function(xhr, textStatus, errorThrown) {
+                $("#status")[0].innerHTML="FAILED!"
+            })
+        });
+        return false;
+    } else {}
+}
+
+$(document).ready(function() {
+
+    $(".btnStart").click(function(){
+        var id = $(this).data("id");
+        $.ajax({
+          type: "PUT",
+          url: "/api/" + id + "/start/",
+          data: {},
+        })
+        .done(function( msg ) {
+          $("#status")[0].innerHTML="Started!";
+        });
+    });
+
+    $(".btnStop").click(function(){
+        var id = $(this).data("id");
+        $.ajax({
+          type: "PUT",
+          url: "/api/" + id + "/finish/",
+          data: {},
+        })
+        .done(function( msg ) {
+          $("#status")[0].innerHTML="Finished!";
+        });
+    });
+});
+
+</script>
+
+{% endblock %}
