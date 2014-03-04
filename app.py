@@ -2,14 +2,19 @@
 
 import datetime, os
 
-from flask import request, url_for, render_template, escape, Markup
+from flask import flash, request, url_for, render_template, escape, Markup, g, redirect
+
 from flask.ext.api import FlaskAPI, status, exceptions
 from flask.ext.api.decorators import set_renderers
 from flask.ext.api.renderers import HTMLRenderer
 from flask.ext.api.exceptions import APIException
 from flask.ext.sqlalchemy import SQLAlchemy
+from flask.ext.login import LoginManager, login_user, logout_user, current_user, login_required
+from flask.ext.wtf import Form
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, desc
+from wtforms import TextField, BooleanField
+from wtforms.validators import Required
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, desc, ForeignKey
 from unipath import Path
 import bleach
 
@@ -17,7 +22,69 @@ TEMPLATE_DIR = Path(__file__).ancestor(1).child("templates")
 
 app = FlaskAPI(__name__, template_folder=TEMPLATE_DIR)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL']
+app.config['SECRET_KEY'] = 'you-will-never-guess'
 db = SQLAlchemy(app)
+
+lm = LoginManager()
+lm.init_app(app)
+lm.login_view = 'login'
+
+
+class LoginForm(Form):
+    username = TextField('username', validators = [Required()])
+
+
+class User(db.Model):
+
+    __tablename__ = "user"
+    id = Column(Integer, primary_key=True)
+    username = Column(String(64), unique=True)
+    books = db.relationship('Book', backref='owner', lazy='dynamic')
+
+    def is_authenticated(self):
+        return True
+
+    def is_active(self):
+        return True
+
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return unicode(self.id)
+
+    def to_json(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'url': self.url,
+            'books': [
+                {
+                    'id': book.id,
+                    'url': book.url,
+                }
+                for book in self.books.filter_by(deleted=False)
+            ],
+            'parent_url': request.host_url.rstrip('/') + url_for(
+                'users'
+            ),
+        }
+
+    def __repr__(self):
+        return '<User {user}>'.format(user=self.username)
+
+    @property
+    def url(self):
+        return request.host_url.rstrip('/') + url_for(
+            'user_detail',
+            key=self.id
+        )
+
+    @classmethod
+    def get_users(self):
+        return [
+            user.to_json() for user in User.query.all()
+        ]
 
 
 class Book(db.Model):
@@ -30,11 +97,19 @@ class Book(db.Model):
     start_date = Column(DateTime)
     finish_date = Column(DateTime)
     deleted = Column(Boolean, default=False)
+    user_id = Column(Integer, ForeignKey('user.id'))
 
     def __repr__(self):
         return "{title} by {author}".format(
             title=self.title,
             author=self.author
+        )
+
+    @property
+    def url(self):
+        return request.host_url.rstrip('/') + url_for(
+            'book_detail',
+            key=self.id
         )
 
     def to_json(self):
@@ -45,11 +120,9 @@ class Book(db.Model):
             'start': self.start_date,
             'finish': self.finish_date,
             'created': self.create_date,
+            'owner': self.owner.to_json(),
             'time': self.reading_time.total_seconds(),
-            'url': request.host_url.rstrip('/') + url_for(
-                'book_detail',
-                key=self.id
-            ),
+            'url': self.url,
             'parent_url': request.host_url.rstrip('/') + url_for(
                 'book_list'
             ),
@@ -66,22 +139,33 @@ class Book(db.Model):
 
     @classmethod
     def get_books(self):
-        return [
-            book.to_json() for book in Book.query.filter(
-                Book.deleted == False
-            ).order_by(
-                desc(Book.id),
-            )
-        ]
+        if g.user.is_authenticated():
+            return [
+                book.to_json() for book in g.user.books.filter_by(
+                    deleted=False
+                ).order_by(
+                    desc(Book.id),
+                )
+            ]
+        else:
+            return [
+                book.to_json() for book in Book.query.filter_by(
+                    deleted=False
+                ).order_by(
+                    desc(Book.id),
+                )
+            ]
 
 
 @app.route("/", methods=['GET'])
 @set_renderers([HTMLRenderer])
+@login_required
 def index():
     return render_template('index.html', books=Book.get_books())
 
 
 @app.route("/api/", methods=['GET', 'POST'])
+@login_required
 def book_list():
     """
     List or create books.
@@ -100,6 +184,7 @@ def book_list():
         book = Book(
             title=title,
             author=author,
+            owner=g.user,
         )
         db.session.add(book)
         db.session.commit()
@@ -109,7 +194,23 @@ def book_list():
     return Book.get_books(), status.HTTP_200_OK
 
 
+@app.route("/api/users/", methods=['GET'])
+@login_required
+def users():
+    return User.get_users(), status.HTTP_200_OK
+
+
+@app.route("/api/users/<int:key>/", methods=['GET'])
+@login_required
+def user_detail(key):
+    user = User.query.get(key)
+    if not user:
+        raise exceptions.NotFound()
+    return user.to_json(), status.HTTP_200_OK
+
+
 @app.route("/api/latest/", methods=['GET'])
+@login_required
 def latest():
     try:
         return Book.get_books()[0]
@@ -118,11 +219,12 @@ def latest():
 
 
 @app.route("/api/<int:key>/", methods=['GET', 'PUT', 'DELETE'])
+@login_required
 def book_detail(key):
     """
     Retrieve, update or delete book instances.
     """
-    book = Book.query.get(key)
+    book = g.user.books.filter_by(id=key).first()
 
     if request.method == 'PUT':
         text = str(request.data.get('text', ''))
@@ -136,6 +238,7 @@ def book_detail(key):
             book = Book(
                 title=title,
                 author=author,
+                user=g.user,
             )
         db.session.add(book)
         db.session.commit()
@@ -155,9 +258,9 @@ def book_detail(key):
 
 
 @app.route("/api/<int:key>/start/", methods=['PUT'])
+@login_required
 def book_start(key):
-    book = Book.query.get(key)
-
+    book = g.user.books.filter_by(id=key).first()
     if book:
         if not book.start_date:
             book.start_date = datetime.datetime.now()
@@ -169,9 +272,9 @@ def book_start(key):
 
 
 @app.route("/api/<int:key>/finish/", methods=['PUT'])
+@login_required
 def book_finish(key):
-    book = Book.query.get(key)
-
+    book = g.user.books.filter_by(id=key).first()
     if book:
         if not book.finish_date and book.start_date:
             book.finish_date = datetime.datetime.now()
@@ -180,6 +283,40 @@ def book_finish(key):
     else:
         raise exceptions.NotFound()
     return book.to_json(), status.HTTP_202_ACCEPTED
+
+
+@lm.user_loader
+def load_user(id):
+    return User.query.get(int(id))
+
+
+@app.before_request
+def before_request():
+    g.user = current_user
+
+
+@app.route('/login/', methods = ['GET', 'POST'])
+@set_renderers([HTMLRenderer])
+def login():
+    if g.user is not None and g.user.is_authenticated():
+        return redirect(url_for('index'))
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(username=form.username.data).first()
+        if not user:
+            user = User(username=form.username.data)
+            db.session.add(user)
+            db.session.commit()
+        login_user(user)
+        flash("Logged in successfully.")
+        return redirect(request.args.get("next") or url_for("index"))
+    return render_template('login.html', form=form)
+
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
 
 
 if __name__ == "__main__":

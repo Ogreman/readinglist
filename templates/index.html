@@ -10,6 +10,8 @@
 ">
 <input type="text" id="text" name="text" onkeydown="if (event.keyCode == 13) document.getElementById('btnPost').click()" />
 <button id="btnPost" onclick="handleForm()" type="button">add</button>
+<button id="btnRefr" onclick="reload()" type="button">refresh</button>
+
 <div id="status" style="font-size: 30px;"></div>
 </h1>
 
@@ -28,7 +30,7 @@
             {% if book.time %}
                 <p style="font-size: 18px;">{{ book.time }}s</p>
             {% endif %}
-        </p>
+        </p><br><br>
     {% endfor %}
 </div>
 </h1>
@@ -48,7 +50,6 @@ function handleForm(){
                     $("#status")[0].innerHTML=data.message;
                 } else {
                     if (data.created) {
-                        $('<p id="book-' + data.id + '">' + data.title + ' by ' + data.author + '</p>').insertAfter("#new");
                         $("#status")[0].innerHTML="POSTED!"
                     } else {
                         $("#status")[0].innerHTML="FAILED!"
@@ -59,12 +60,12 @@ function handleForm(){
                 $("#status")[0].innerHTML="FAILED!"
             })
         });
+        reload();
         return false;
     } else {}
 }
 
-$(document).ready(function() {
-
+function initBtns() {
     $(".btnStart").click(function(){
         var id = $(this).data("id");
         $.ajax({
@@ -75,6 +76,7 @@ $(document).ready(function() {
         .done(function( msg ) {
           $("#status")[0].innerHTML="Started!";
         });
+        reload();
     });
 
     $(".btnStop").click(function(){
@@ -87,7 +89,34 @@ $(document).ready(function() {
         .done(function( msg ) {
           $("#status")[0].innerHTML="Finished!";
         });
+        reload();
     });
+}
+
+function reload() {
+    $.get('/api/', {})
+    .done(function(data) {
+        $('#books')[0].innerHTML='';
+        $.each(data, function(k, v) {
+            $('#books')[0].innerHTML += '<p id="book-' + v.id + '"><a href="' + v.url + '">' + v.title + " by " + v.author + "</a></p>";
+            if (v.time) {
+                $('#books')[0].innerHTML += '<p style="font-size: 18px;">' + v.time + 's</p>'
+            }
+            if (!v.start) {
+                $('#books')[0].innerHTML += '<button class="btnStart" data-id="' + v.id + '" type="button">start</button>'
+            }
+            if (!v.finish) {
+                $('#books')[0].innerHTML += '<button class="btnStop" data-id="' + v.id + '" type="button">finish</button>'
+            }
+            $('#books')[0].innerHTML += '<br> <br>'
+
+        });
+        initBtns();
+    })
+}
+
+$(document).ready(function() {
+    initBtns();
 });
 
 </script>
