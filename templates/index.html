@@ -21,25 +21,24 @@
     <div id="new"></div>
     {% for book in books %}
         <p id="book-{{ book.id }}">
-
-            {% if book.start and book.finish %}
-                <strike>
-            {% endif %}
-            <a href="{{ book.url }}">{{ book.title|title }}</a> by {{ book.author|title }}
-            {% if book.start and book.finish %}
-                </strike>
-            {% endif %}
-
-            {% if not book.start %}
-                <button class="btnStart" data-id="{{ book.id }}" type="button">start</button>
-            {% endif %}
-            {% if not book.finish %}
-                <button class="btnStop" data-id="{{ book.id }}" type="button">finish</button>
-            {% endif %}
-            {% if book.time %}
-                <p style="font-size: 18px;">{{ book.time }}s</p>
-            {% endif %}
-        </p><br><br>
+        {% if book.start and book.finish %}
+            <strike>
+        {% endif %}
+        <a href="{{ book.url }}">{{ book.title|title }}</a> By {{ book.author|title }}
+        {% if book.start and book.finish %}
+            </strike>
+        {% endif %}
+        </p>
+        {% if not book.start %}
+            <button class="btnStart" data-id="{{ book.id }}" type="button">start</button>
+        {% endif %}
+        {% if not book.finish %}
+            <button class="btnStop" data-id="{{ book.id }}" type="button">finish</button>
+        {% endif %}
+        {% if book.time %}
+            <p style="font-size: 18px;">{{ book.time }}s</p>
+        {% endif %}
+        <br><br>
     {% endfor %}
 </div>
 </h1>
@@ -107,12 +106,15 @@ function reload() {
     .done(function(data) {
         $('#books')[0].innerHTML='';
         $.each(data, function(k, v) {
-            $('#books')[0].innerHTML += '<p id="book-' + v.id + '"><a href="' + v.url + '">' + v.title + " by " + v.author + "</a></p>";
+            $('#books')[0].innerHTML += '<p id="book-' + v.id + '" style="text-transform: capitalize;"><a href="' + v.url + '">' + v.title + "</a> by " + v.author + "</p>"
+            if (v.start && v.finish) {
+                $('#book-' + v.id).css('text-decoration', 'line-through');
+            }
             if (v.time) {
                 $('#books')[0].innerHTML += '<p style="font-size: 18px;">' + v.time + 's</p>'
             }
             if (!v.start) {
-                $('#books')[0].innerHTML += '<button class="btnStart" data-id="' + v.id + '" type="button">start</button>'
+                $('#books')[0].innerHTML += '<button class="btnStart" data-id="' + v.id + '" type="button">start</button>\n'
             }
             if (!v.finish) {
                 $('#books')[0].innerHTML += '<button class="btnStop" data-id="' + v.id + '" type="button">finish</button>'
