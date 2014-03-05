@@ -122,6 +122,7 @@ class Book(db.Model):
             'author': self.author,
             'start': self.start_date,
             'finish': self.finish_date,
+            'has_finished': self.has_finished,
             'created': self.create_date,
             'owner': self.owner.to_json(),
             'time': self.reading_time.total_seconds(),
@@ -139,6 +140,10 @@ class Book(db.Model):
             return datetime.datetime.now() - self.start_date
         else:
             return datetime.timedelta(0)
+
+    @property
+    def has_finished(self):
+        return self.start_date and self.finish_date
 
     @classmethod
     def get_books(self):
@@ -165,6 +170,16 @@ class Book(db.Model):
 @login_required
 def index():
     return render_template('index.html', books=Book.get_books())
+
+
+@app.route("/book/<int:key>/", methods=['GET'])
+@set_renderers([HTMLRenderer])
+@login_required
+def book(key):
+    book = g.user.books.filter_by(id=key).first()
+    if not book:
+        raise exceptions.NotFound()
+    return render_template('book.html', book=book.to_json())
 
 
 @app.route("/api/", methods=['GET', 'POST'])

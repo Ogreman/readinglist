@@ -1,0 +1,18 @@
+ <p id="book-{{ book.id }}">
+{% if book.has_finished %}
+    <strike>
+{% endif %}
+<a href="{{ book.url }}">{{ book.title|title }}</a> by {{ book.author|title }}
+{% if book.has_finished %}
+    </strike>
+{% endif %}
+</p>
+{% if not book.start %}
+    <button class="btnStart" data-id="{{ book.id }}" type="button">start</button>
+{% endif %}
+{% if not book.finish %}
+    <button class="btnStop" data-id="{{ book.id }}" type="button">finish</button>
+{% endif %}
+{% if book.time %}
+    <p style="font-size: 18px;">{{ book.time|duration }}</p>
+{% endif %}
