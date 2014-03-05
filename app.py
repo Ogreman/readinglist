@@ -17,6 +17,7 @@ from wtforms.validators import Required
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, desc, ForeignKey
 from unipath import Path
 import bleach
+import filters
 
 TEMPLATE_DIR = Path(__file__).ancestor(1).child("templates")
 
@@ -28,6 +29,8 @@ db = SQLAlchemy(app)
 lm = LoginManager()
 lm.init_app(app)
 lm.login_view = 'login'
+
+filters.init_app(app)
 
 
 class LoginForm(Form):

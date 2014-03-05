@@ -36,7 +36,7 @@
             <button class="btnStop" data-id="{{ book.id }}" type="button">finish</button>
         {% endif %}
         {% if book.time %}
-            <p style="font-size: 18px;">{{ book.time }}s</p>
+            <p style="font-size: 18px;">{{ book.time|duration }}</p>
         {% endif %}
         <br><br>
     {% endfor %}
